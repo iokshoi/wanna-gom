@@ -1,16 +1,13 @@
-// Optional local bridge for Sign in with ChatGPT or a Claude API key.
-// ChatGPT needs no third-party packages; Claude needs `npm install` for @anthropic-ai/sdk.
+// Optional local bridge for Sign in with ChatGPT or the local Claude Code login (Claude plan).
+// No third-party packages are needed.
 const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
 const crypto = require("node:crypto");
+const { spawn } = require("node:child_process");
 
-let Anthropic = null;
-try { Anthropic = require("@anthropic-ai/sdk"); } catch { /* Claude stays unavailable until npm install. */ }
-const claudeModel = "claude-opus-5-5";
-const claudeConfigured = Boolean(Anthropic && (process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN));
-const claude = claudeConfigured ? new Anthropic({ timeout: 30000, maxRetries: 1 }) : null;
+let claudeConfigured = false;
 
 const host = "127.0.0.1";
 const port = Number(process.env.WANNAGOM_PORT || 4173);
@@ -204,33 +201,59 @@ function validateScore(parsed) {
   return { score: parsed.score, factor: parsed.factor };
 }
 
-async function inferScoreWithClaude(text, baseline) {
-  const response = await claude.beta.messages.create({
-    model: claudeModel,
-    max_tokens: 4000,
-    output_config: {
-      effort: "low",
-      format: {
-        type: "json_schema",
-        schema: {
-          type: "object",
-          properties: {
-            score: { type: "integer", minimum: 0, maximum: 100 },
-            factor: { type: "string", enum: scoreFactors }
-          },
-          required: ["score", "factor"],
-          additionalProperties: false
-        }
-      }
-    },
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    system: scoreInstructions,
-    messages: [{ role: "user", content: JSON.stringify({ sentence: text, baseline }) }]
+// Claude Code runs with the plan login, so API-key variables must not leak into it.
+function claudeEnv() {
+  const env = { ...process.env };
+  for (const name of ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDECODE"]) delete env[name];
+  return env;
+}
+
+function runClaude(args, input, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const child = spawn("claude", args, { cwd: os.tmpdir(), env: claudeEnv(), stdio: ["pipe", "pipe", "pipe"] });
+    let stdout = "";
+    const timer = setTimeout(() => { child.kill(); reject(new Error("Claude Code timed out")); }, timeoutMs);
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+      if (stdout.length > 50000) child.kill();
+    });
+    child.on("error", (error) => { clearTimeout(timer); reject(error); });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (code === 0) resolve(stdout);
+      else reject(new Error(`Claude Code exited with ${code}`));
+    });
+    child.stdin.end(input);
   });
-  if (response.stop_reason !== "end_turn") throw new Error(`Claude stop_reason ${response.stop_reason}`);
-  const output = response.content.filter((block) => block.type === "text").map((block) => block.text).join("");
-  return validateScore(JSON.parse(output.trim()));
+}
+
+async function checkClaude() {
+  try {
+    await runClaude(["--version"], "", 10000);
+    claudeConfigured = true;
+  } catch {
+    claudeConfigured = false;
+  }
+}
+
+async function inferScoreWithClaude(text, baseline) {
+  const schema = {
+    type: "object",
+    properties: {
+      score: { type: "integer", minimum: 0, maximum: 100 },
+      factor: { type: "string", enum: scoreFactors }
+    },
+    required: ["score", "factor"],
+    additionalProperties: false
+  };
+  const output = await runClaude([
+    "-p", "--output-format", "json", "--tools", "", "--strict-mcp-config",
+    "--no-session-persistence", "--effort", "low",
+    "--system-prompt", scoreInstructions, "--json-schema", JSON.stringify(schema)
+  ], JSON.stringify({ sentence: text, baseline }), 60000);
+  const result = JSON.parse(output);
+  if (result.is_error || !result.structured_output) throw new Error(`Claude Code result ${result.subtype || "invalid"}`);
+  return validateScore(result.structured_output);
 }
 
 async function inferScore(text, baseline, token) {
@@ -296,7 +319,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 400, { error: "Invalid input" });
       }
       if (body.provider === "claude") {
-        if (!claude) return send(res, 401, { error: "Claude not configured" });
+        if (!claudeConfigured) return send(res, 401, { error: "Claude not configured" });
         return send(res, 200, { ...await inferScoreWithClaude(body.text, body.baseline), provider: "claude" });
       }
       if (body.provider !== "chatgpt") return send(res, 400, { error: "Invalid provider" });
@@ -331,9 +354,10 @@ const server = http.createServer(async (req, res) => {
   return send(res, 404, { error: "Not found" });
 });
 
-server.listen(port, host, () => {
+server.listen(port, host, async () => {
   console.log(`워나곰: ${origin}`);
-  if (claudeConfigured) console.log(`Claude 문맥 보정 사용: ${claudeModel}`);
-  else if (!Anthropic) console.log("Claude를 쓰려면 npm install 후 ANTHROPIC_API_KEY를 설정하세요.");
-  else console.log("Claude를 쓰려면 .env 파일에 ANTHROPIC_API_KEY를 넣고 서버를 다시 시작하세요.");
+  await checkClaude();
+  console.log(claudeConfigured
+    ? "Claude 문맥 보정 사용: Claude Code 로그인(내 플랜)"
+    : "Claude를 쓰려면 Claude Code를 설치하고 로그인한 뒤 서버를 다시 시작하세요.");
 });

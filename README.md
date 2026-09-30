@@ -37,11 +37,7 @@ open index.html
 
 ### 2. AI 보정까지 써 보기 (로컬 서버)
 
-[Node.js](https://nodejs.org/) 22.9 이상이 필요해요.
-
-```bash
-npm install
-```
+[Node.js](https://nodejs.org/) 18 이상이 필요해요. 설치할 패키지는 없어요.
 
 ```bash
 npm start
@@ -50,11 +46,9 @@ npm start
 서버가 켜지면 👉 **http://127.0.0.1:4173** 에 접속하세요. 화면 아래 `AI 문맥 보정`에서 사용할 AI를 고를 수 있어요.
 
 - **ChatGPT**: `Continue with ChatGPT`를 눌러 로그인하면 ChatGPT 플랜으로 보정해요.
-- **Claude**: `.env.example`을 `.env`로 복사하고 API 키를 넣은 뒤 서버를 다시 켜세요. 모델은 `claude-opus-5-5`를 사용해요.
-
-```bash
-cp .env.example .env
-```
+- **Claude**: 이 컴퓨터의 [Claude Code](https://claude.com/claude-code)에 로그인되어 있으면 **내 Claude 플랜**으로 보정해요. API 키는 필요 없어요.
+  - 계산할 때마다 플랜 사용량이 조금씩 차감되고, 몇 초 정도 더 걸려요.
+  - 내 로그인으로 동작하니 나 혼자 로컬에서만 쓰세요.
 
 ## ✦ 폴더 구조
 
@@ -64,14 +58,13 @@ wanna-go-home/
 ├── src/
 │   ├── app.js          # 점수 계산, 화면 전환, AI 선택
 │   └── styles.css      # 2yk + 팝 스타일 디자인
-├── server.js           # 선택형 로컬 AI 서버 (ChatGPT 로그인 / Claude API)
-├── docs/               # 기획서, 프롬프트 설계, 점검 기록
-└── .env.example        # Claude API 키 설정 양식
+├── server.js           # 선택형 로컬 AI 서버 (ChatGPT 로그인 / Claude Code)
+└── docs/               # 기획서, 프롬프트 설계, 점검 기록, 화면 캡처
 ```
 
 ## ✦ 보안 메모
 
-- Claude API 키는 `.env`에만 두세요. `.env`는 `.gitignore`에 들어 있어 저장소에 올라가지 않아요.
+- Claude는 Claude Code의 로그인을 그대로 써요. 서버는 Claude Code를 도구 없이(파일 읽기·명령 실행 없이) 답만 받도록 실행해요.
 - ChatGPT 로그인 정보는 브라우저가 아니라 로컬 앱 저장소(`~/Library/Application Support/Wannagom`)에 보관돼요.
 - 로컬 서버는 `127.0.0.1`에서만 열리고, 다른 주소에서 온 요청은 막아요.
 

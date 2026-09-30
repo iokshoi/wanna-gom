@@ -9,7 +9,7 @@
 - 기본 점수만 시험할 때는 빌드 도구·프레임워크 없이 루트의 `index.html`을 브라우저에서 직접 여세요.
 - 터미널에서 열 때는 Windows에서 `start index.html`, macOS에서 `open index.html`을 사용하세요.
 - ChatGPT 문맥 보정을 시험할 때는 Node.js에서 `node server.js`를 실행하고 `http://127.0.0.1:4173`에 접속하세요. 화면에서 ChatGPT 로그인을 완료해야 AI 요청이 시작됩니다.
-- Claude 문맥 보정을 시험할 때는 처음 한 번 `npm install`을 실행하고, `.env.example`을 `.env`로 복사해 `ANTHROPIC_API_KEY`에 API 키를 넣은 뒤 `npm start`로 서버를 켜세요. 화면의 `AI 문맥 보정`에서 ChatGPT와 Claude(`claude-opus-5-5`) 중 하나를 고릅니다. `.env`는 저장소에 올리지 마세요.
+- Claude 문맥 보정을 시험할 때는 Claude Code(`claude` 명령)에 로그인된 상태에서 `npm start`로 서버를 켜세요. 서버가 Claude Code를 거쳐 사용자의 Claude 플랜으로 요청합니다. 화면의 `AI 문맥 보정`에서 ChatGPT와 Claude 중 하나를 고릅니다.
 - 코드를 고친 뒤 브라우저에서 새로고침(Windows `F5` / macOS `Cmd+R`)해 다시 확인하세요.
 - 직접 파일로 열면 사전 규칙만 작동합니다. AI 인증 정보는 브라우저 코드가 아닌 로컬 앱 저장소에 보관합니다. 실제 계정 로그인과 AI 응답을 검증하기 전에는 해당 경로의 성공을 확정적으로 보고하지 마세요.
 

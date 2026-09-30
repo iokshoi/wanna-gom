@@ -46,8 +46,8 @@ function renderAiStatus() {
   if (provider === "claude") {
     aiConnected = aiStatusData.claude === true;
     aiStatus.textContent = aiConnected
-      ? "Claude 연결됨 (API 키). 입력 문장을 Claude로 보정해요."
-      : "Claude API 키가 설정되지 않았어요. 서버의 .env 파일에 키를 넣고 다시 시작해 주세요. 지금은 기본 점수로 계산해요.";
+      ? "Claude 연결됨 (내 플랜 · Claude Code). 입력 문장을 Claude로 보정해요. 계산에 몇 초 더 걸릴 수 있어요."
+      : "Claude Code를 찾지 못했어요. Claude Code를 설치하고 로그인한 뒤 서버를 다시 시작해 주세요. 지금은 기본 점수로 계산해요.";
     aiLogin.hidden = true;
     aiLogout.hidden = true;
     return;
