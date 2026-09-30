@@ -1,9 +1,16 @@
-// Optional local bridge for Sign in with ChatGPT. No third-party packages are needed.
+// Optional local bridge for Sign in with ChatGPT or a Claude API key.
+// ChatGPT needs no third-party packages; Claude needs `npm install` for @anthropic-ai/sdk.
 const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
 const crypto = require("node:crypto");
+
+let Anthropic = null;
+try { Anthropic = require("@anthropic-ai/sdk"); } catch { /* Claude stays unavailable until npm install. */ }
+const claudeModel = "claude-opus-5-5";
+const claudeConfigured = Boolean(Anthropic && (process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN));
+const claude = claudeConfigured ? new Anthropic({ timeout: 30000, maxRetries: 1 }) : null;
 
 const host = "127.0.0.1";
 const port = Number(process.env.WANNAGOM_PORT || 4173);
@@ -188,6 +195,44 @@ async function readBody(req) {
   return JSON.parse(body);
 }
 
+const scoreInstructions = "한국어 문장 전체의 문맥을 읽어 집에 가고 싶은 강도를 판단하세요. 부정, 반어, 과장, 유행어, 비속어의 의미를 고려하세요. 기본 점수는 참고값입니다. 반드시 {\"score\":정수,\"factor\":문자열} 형태의 JSON만 출력하세요. score는 0부터 100 사이이고 factor는 피로, 학업, 사람, 부정, 반어, 강조, 기타 중 하나입니다. 사용자에게 보여줄 문장은 작성하지 마세요.";
+const scoreFactors = ["피로", "학업", "사람", "부정", "반어", "강조", "기타"];
+
+function validateScore(parsed) {
+  if (!Number.isInteger(parsed.score) || parsed.score < 0 || parsed.score > 100) throw new Error("Invalid model score");
+  if (!scoreFactors.includes(parsed.factor)) throw new Error("Invalid model factor");
+  return { score: parsed.score, factor: parsed.factor };
+}
+
+async function inferScoreWithClaude(text, baseline) {
+  const response = await claude.beta.messages.create({
+    model: claudeModel,
+    max_tokens: 4000,
+    output_config: {
+      effort: "low",
+      format: {
+        type: "json_schema",
+        schema: {
+          type: "object",
+          properties: {
+            score: { type: "integer", minimum: 0, maximum: 100 },
+            factor: { type: "string", enum: scoreFactors }
+          },
+          required: ["score", "factor"],
+          additionalProperties: false
+        }
+      }
+    },
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default",
+    system: scoreInstructions,
+    messages: [{ role: "user", content: JSON.stringify({ sentence: text, baseline }) }]
+  });
+  if (response.stop_reason !== "end_turn") throw new Error(`Claude stop_reason ${response.stop_reason}`);
+  const output = response.content.filter((block) => block.type === "text").map((block) => block.text).join("");
+  return validateScore(JSON.parse(output.trim()));
+}
+
 async function inferScore(text, baseline, token) {
   const catalog = await jsonOrThrow(await fetch(`${resource}/models`, {
     headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15000)
@@ -199,7 +244,7 @@ async function inferScore(text, baseline, token) {
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model, store: false, stream: true,
-      instructions: "한국어 문장 전체의 문맥을 읽어 집에 가고 싶은 강도를 판단하세요. 부정, 반어, 과장, 유행어, 비속어의 의미를 고려하세요. 기본 점수는 참고값입니다. 반드시 {\"score\":정수,\"factor\":문자열} 형태의 JSON만 출력하세요. score는 0부터 100 사이이고 factor는 피로, 학업, 사람, 부정, 반어, 강조, 기타 중 하나입니다. 사용자에게 보여줄 문장은 작성하지 마세요.",
+      instructions: scoreInstructions,
       input: [{ role: "user", content: JSON.stringify({ sentence: text, baseline }) }]
     }),
     signal: AbortSignal.timeout(30000)
@@ -228,10 +273,7 @@ async function inferScore(text, baseline, token) {
     }
   }
   if (!completed) throw new Error("Inference did not complete");
-  const parsed = JSON.parse(output.trim());
-  if (!Number.isInteger(parsed.score) || parsed.score < 0 || parsed.score > 100) throw new Error("Invalid model score");
-  if (!["피로", "학업", "사람", "부정", "반어", "강조", "기타"].includes(parsed.factor)) throw new Error("Invalid model factor");
-  return { score: parsed.score, factor: parsed.factor };
+  return validateScore(JSON.parse(output.trim()));
 }
 
 const server = http.createServer(async (req, res) => {
@@ -242,7 +284,7 @@ const server = http.createServer(async (req, res) => {
     return send(res, 200, fs.readFileSync(path.join(__dirname, file), "utf8"), type);
   }
   if (req.method === "GET" && url.pathname === "/api/status") {
-    return send(res, 200, { connected: Boolean(account?.accessToken && account.scopes?.includes("chatgpt.tokens.use.direct")), email: account?.email || "" });
+    return send(res, 200, { connected: Boolean(account?.accessToken && account.scopes?.includes("chatgpt.tokens.use.direct")), email: account?.email || "", claude: claudeConfigured });
   }
   if (req.method === "GET" && url.pathname === "/auth/start") return beginSignIn(res);
   if (req.method === "GET" && url.pathname === "/auth/callback") return completeSignIn(url, res);
@@ -253,9 +295,14 @@ const server = http.createServer(async (req, res) => {
       if (typeof body.text !== "string" || body.text.length > 180 || !body.text.trim() || !Number.isInteger(body.baseline) || body.baseline < 0 || body.baseline > 100) {
         return send(res, 400, { error: "Invalid input" });
       }
+      if (body.provider === "claude") {
+        if (!claude) return send(res, 401, { error: "Claude not configured" });
+        return send(res, 200, { ...await inferScoreWithClaude(body.text, body.baseline), provider: "claude" });
+      }
+      if (body.provider !== "chatgpt") return send(res, 400, { error: "Invalid provider" });
       const token = await getAccessToken();
-      if (!token) return send(res, 401, { error: "ChatGPT not connected" });
-      return send(res, 200, await inferScore(body.text, body.baseline, token));
+      if (!token) return send(res, 401, { error: "AI not connected" });
+      return send(res, 200, { ...await inferScore(body.text, body.baseline, token), provider: "chatgpt" });
     } catch (error) {
       console.error("AI score fallback:", error.message);
       return send(res, 503, { error: "AI unavailable" });
@@ -284,4 +331,9 @@ const server = http.createServer(async (req, res) => {
   return send(res, 404, { error: "Not found" });
 });
 
-server.listen(port, host, () => console.log(`워나곰: ${origin}`));
+server.listen(port, host, () => {
+  console.log(`워나곰: ${origin}`);
+  if (claudeConfigured) console.log(`Claude 문맥 보정 사용: ${claudeModel}`);
+  else if (!Anthropic) console.log("Claude를 쓰려면 npm install 후 ANTHROPIC_API_KEY를 설정하세요.");
+  else console.log("Claude를 쓰려면 .env 파일에 ANTHROPIC_API_KEY를 넣고 서버를 다시 시작하세요.");
+});

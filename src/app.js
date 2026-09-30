@@ -24,8 +24,44 @@ const numberFormatter = new Intl.NumberFormat("ko-KR");
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 let loadingTimer = null;
 let scoreAnimation = null;
+const providerInputs = document.querySelectorAll('input[name="ai-provider"]');
 let aiConnected = false;
+let aiStatusData = null;
 const localAiServer = location.protocol === "http:" && location.hostname === "127.0.0.1";
+
+function getSelectedProvider() {
+  return document.querySelector('input[name="ai-provider"]:checked')?.value || "chatgpt";
+}
+
+function renderAiStatus() {
+  const provider = getSelectedProvider();
+  if (!aiStatusData) {
+    aiConnected = false;
+    aiStatus.textContent = "AI 연결 상태를 확인할 수 없어 기본 점수로 계산해요.";
+    aiLogin.hidden = provider !== "chatgpt";
+    aiLogout.hidden = true;
+    return;
+  }
+  const chatgptConnected = aiStatusData.connected === true;
+  if (provider === "claude") {
+    aiConnected = aiStatusData.claude === true;
+    aiStatus.textContent = aiConnected
+      ? "Claude 연결됨 (API 키). 입력 문장을 Claude로 보정해요."
+      : "Claude API 키가 설정되지 않았어요. 서버의 .env 파일에 키를 넣고 다시 시작해 주세요. 지금은 기본 점수로 계산해요.";
+    aiLogin.hidden = true;
+    aiLogout.hidden = true;
+    return;
+  }
+  aiConnected = chatgptConnected;
+  aiStatus.textContent = chatgptConnected
+    ? `ChatGPT 연결됨${aiStatusData.email ? ` · ${aiStatusData.email}` : ""}. 입력 문장을 ChatGPT로 보정해요.`
+    : "연결하면 ChatGPT 플랜으로 문맥을 보정해요. 연결 전에는 기본 점수로 계산해요.";
+  aiLogin.hidden = chatgptConnected;
+  aiLogout.hidden = !chatgptConnected;
+  if (!chatgptConnected && new URLSearchParams(location.search).get("login") === "failed") {
+    aiStatus.textContent = "ChatGPT 연결을 마치지 못했어요. 다시 눌러 시도해 주세요. 기본 점수는 계속 사용할 수 있어요.";
+  }
+}
 
 async function refreshAiStatus() {
   if (!localAiServer) return;
@@ -33,23 +69,24 @@ async function refreshAiStatus() {
   try {
     const response = await fetch("/api/status", { cache: "no-store" });
     if (!response.ok) throw new Error("status unavailable");
-    const status = await response.json();
-    aiConnected = status.connected === true;
-    aiStatus.textContent = aiConnected
-      ? `ChatGPT 연결됨${status.email ? ` · ${status.email}` : ""}. 입력 문장을 AI로 보정해요.`
-      : "연결하면 ChatGPT 플랜으로 문맥을 보정해요. 연결 전에는 기본 점수로 계산해요.";
-    aiLogin.hidden = aiConnected;
-    aiLogout.hidden = !aiConnected;
-    if (!aiConnected && new URLSearchParams(location.search).get("login") === "failed") {
-      aiStatus.textContent = "ChatGPT 연결을 마치지 못했어요. 다시 눌러 시도해 주세요. 기본 점수는 계속 사용할 수 있어요.";
-    }
+    aiStatusData = await response.json();
   } catch {
-    aiConnected = false;
-    aiStatus.textContent = "AI 연결 상태를 확인할 수 없어 기본 점수로 계산해요.";
-    aiLogin.hidden = false;
-    aiLogout.hidden = true;
+    aiStatusData = null;
   }
+  renderAiStatus();
 }
+
+try {
+  const savedProvider = localStorage.getItem("wannagomAiProvider");
+  providerInputs.forEach((input) => { if (input.value === savedProvider) input.checked = true; });
+} catch { /* Default selection stays ChatGPT. */ }
+
+providerInputs.forEach((input) => {
+  input.addEventListener("change", () => {
+    try { localStorage.setItem("wannagomAiProvider", getSelectedProvider()); } catch { /* Selection still works for this visit. */ }
+    renderAiStatus();
+  });
+});
 
 function normalizeText(text) {
   return text.normalize("NFKC").toLowerCase().replace(/\s+/g, "").replace(/[.,!?~…]/g, "");
@@ -208,7 +245,9 @@ function animateScore(target) {
   scoreAnimation = requestAnimationFrame(frame);
 }
 
-function renderResult(result, source = "dictionary", factor = "기타") {
+const aiProviderNames = { claude: "Claude", chatgpt: "ChatGPT" };
+
+function renderResult(result, source = "dictionary", factor = "기타", provider = "chatgpt") {
   scoreLabel.textContent = getScoreLabel(result.score);
   scoreReason.textContent = source === "ai"
     ? aiReasons[factor]
@@ -217,7 +256,7 @@ function renderResult(result, source = "dictionary", factor = "기타") {
   recommendationTitle.textContent = result.recommendation.title;
   recommendationDetail.textContent = result.recommendation.detail;
   scoreNote.textContent = source === "ai"
-    ? "ChatGPT로 문맥을 보정한 놀이용 점수예요."
+    ? `${aiProviderNames[provider]}로 문맥을 보정한 놀이용 점수예요.`
     : aiConnected ? "AI 연결에 실패해 사전 규칙의 기본 점수로 계산했어요." : "사전 규칙으로 계산한 놀이용 점수예요.";
   displayScore.textContent = "0";
   displayScore.setAttribute("aria-label", "0점");
@@ -262,12 +301,13 @@ feelingForm.addEventListener("submit", async (event) => {
   let finalResult = result;
   let source = "dictionary";
   let factor = "기타";
+  let provider = "chatgpt";
   if (aiConnected) {
     try {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, baseline: result.score })
+        body: JSON.stringify({ text, baseline: result.score, provider: getSelectedProvider() })
       });
       if (!response.ok) throw new Error("AI unavailable");
       const data = await response.json();
@@ -280,13 +320,14 @@ feelingForm.addEventListener("submit", async (event) => {
       }) };
       source = "ai";
       factor = data.factor;
+      if (Object.hasOwn(aiProviderNames, data.provider)) provider = data.provider;
     } catch { /* The planned dictionary fallback remains available. */ }
   }
   const remaining = Math.max(0, (reducedMotion.matches ? 250 : 950) - (performance.now() - start));
   loadingTimer = window.setTimeout(() => {
     loadingTimer = null;
     calculateButton.disabled = false;
-    renderResult(finalResult, source, factor);
+    renderResult(finalResult, source, factor, provider);
   }, remaining);
 });
 

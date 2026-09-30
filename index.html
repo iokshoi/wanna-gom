@@ -97,6 +97,10 @@
               <div id="ai-connect" class="ai-connect" hidden>
                 <div>
                   <strong>AI 문맥 보정</strong>
+                  <div class="ai-picker" role="radiogroup" aria-label="사용할 AI">
+                    <label><input type="radio" name="ai-provider" value="chatgpt" checked /> ChatGPT</label>
+                    <label><input type="radio" name="ai-provider" value="claude" /> Claude</label>
+                  </div>
                   <p id="ai-status">연결 상태를 확인하는 중...</p>
                 </div>
                 <a id="ai-login" class="connect-button" href="/auth/start" hidden>Continue with ChatGPT</a>
