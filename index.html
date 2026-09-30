@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#fff7ed" />
+    <meta name="description" content="오늘 얼마나 집에 가고 싶은지 적고, 워나곰의 점수와 작은 추천을 받아보세요." />
+    <title>워나곰 | 오늘의 집가고 싶은 지수</title>
+    <link rel="stylesheet" href="src/styles.css" />
+    <script src="src/app.js" defer></script>
+  </head>
+  <body>
+    <div class="page-decor decor-one" aria-hidden="true"></div>
+    <div class="page-decor decor-two" aria-hidden="true"></div>
+
+    <div class="site-wrap">
+      <header class="site-header">
+        <a class="brand" href="index.html" aria-label="워나곰 처음 화면">
+          <span class="brand-mark" aria-hidden="true">★</span>
+          <span>워나곰<span class="brand-dot">.</span></span>
+        </a>
+        <span class="header-tag"><span class="tag-sparkle" aria-hidden="true">✳</span> TODAY'S HOME METER</span>
+      </header>
+
+      <main>
+        <section class="hero" aria-labelledby="page-title">
+          <div class="hero-copy">
+            <span class="eyebrow"><span aria-hidden="true">✦</span> 마음을 숫자로 바꾸는 작은 놀이</span>
+            <h1 id="page-title">오늘 나의<br /><span class="highlight">집 가고 싶은 지수</span>는?</h1>
+            <p>수업, 과제, 사람들 사이에서 집 생각이 난다면<br class="desktop-break" /> 지금 기분을 워나곰에게 말해줘!</p>
+            <div class="hero-stickers" aria-hidden="true">
+              <span class="sticker sticker-yellow">HOME?</span>
+              <span class="sticker sticker-blue">오늘의 나 ✦</span>
+              <span class="sticker sticker-pink">★ ★ ★</span>
+            </div>
+          </div>
+
+          <div class="mascot-wrap" aria-hidden="true">
+            <div class="orbit orbit-back"></div>
+            <div class="mascot-star mascot-star-one">✦</div>
+            <div class="mascot-star mascot-star-two">★</div>
+            <div class="mascot-card">
+              <div class="bear-ear ear-left"></div>
+              <div class="bear-ear ear-right"></div>
+              <div class="bear-face">
+                <span class="bear-eye eye-left"></span>
+                <span class="bear-eye eye-right"></span>
+                <span class="bear-cheek cheek-left"></span>
+                <span class="bear-cheek cheek-right"></span>
+                <span class="bear-nose"></span>
+                <span class="bear-mouth"></span>
+              </div>
+              <span class="mascot-caption">WANNA<br />GO HOME</span>
+            </div>
+            <span class="floating-bubble">집... 가고 싶곰</span>
+          </div>
+        </section>
+
+        <section class="experience" aria-label="집 가고 싶은 지수 계산기">
+          <div class="experience-topline">
+            <span>THE HOME-O-METER</span>
+            <span>✷ &nbsp; 01 / 01</span>
+          </div>
+
+          <div class="experience-panel">
+            <section id="input-screen" class="screen" aria-labelledby="input-title">
+              <div class="section-heading">
+                <span class="step-badge">STEP 01</span>
+                <div>
+                  <h2 id="input-title">지금 기분, 한 줄로 적어봐</h2>
+                  <p>짧아도 좋아. 솔직한 마음이면 충분해.</p>
+                </div>
+              </div>
+
+              <form id="feeling-form" novalidate>
+                <label class="field-label" for="feeling-input">나의 오늘은...</label>
+                <div class="textarea-wrap">
+                  <textarea id="feeling-input" name="feeling" rows="4" maxlength="180" placeholder="예: 과제는 끝이 없고 너무 피곤해서 집 가고 싶어..." aria-describedby="field-hint form-error"></textarea>
+                  <span id="char-count" class="char-count">0 / 180</span>
+                </div>
+                <p id="field-hint" class="field-hint">집 생각, 피로, 수업이나 과제처럼 지금 느낌을 구체적으로 적어줘.</p>
+                <p id="form-error" class="form-error" role="alert" hidden></p>
+
+                <div class="examples">
+                  <span class="examples-label">뭐라고 적을지 고민된다면</span>
+                  <div class="example-list">
+                    <button type="button" class="example-chip" data-example="시험 끝나서 기운이 하나도 없어. 집 가고 싶어">시험 끝나고 방전</button>
+                    <button type="button" class="example-chip" data-example="오늘은 꽤 괜찮아. 집 생각은 별로 안 나">오늘은 괜찮은 편</button>
+                    <button type="button" class="example-chip" data-example="과제가 너무 많아. 지금 당장 집 가고 싶어">과제 때문에 집 생각</button>
+                  </div>
+                </div>
+
+                <button id="calculate-button" class="primary-button" type="submit">
+                  <span>집 가고 싶은 정도 보기</span><span class="button-arrow" aria-hidden="true">↗</span>
+                </button>
+              </form>
+              <div id="ai-connect" class="ai-connect" hidden>
+                <div>
+                  <strong>AI 문맥 보정</strong>
+                  <p id="ai-status">연결 상태를 확인하는 중...</p>
+                </div>
+                <a id="ai-login" class="connect-button" href="/auth/start" hidden>Continue with ChatGPT</a>
+                <button id="ai-logout" class="connect-button" type="button" hidden>연결 해제</button>
+              </div>
+            </section>
+
+            <section id="loading-screen" class="screen loading-screen" aria-live="polite" aria-labelledby="loading-title" hidden>
+              <div class="loading-icon" aria-hidden="true"><span>★</span><span>✦</span><span>★</span></div>
+              <span class="step-badge">CHECKING YOUR MOOD</span>
+              <h2 id="loading-title">기분 읽는 중<span class="loading-dots" aria-hidden="true">...</span></h2>
+              <p>워나곰이 오늘의 마음을 살펴보고 있어!</p>
+              <div class="loading-track" aria-hidden="true"><span></span></div>
+            </section>
+
+            <section id="result-screen" class="screen result-screen" aria-live="polite" aria-labelledby="result-title" hidden>
+              <div class="result-top">
+                <span class="step-badge">TODAY'S RESULT</span>
+                <span class="result-sparkle" aria-hidden="true">✦ &nbsp; ★ &nbsp; ✳</span>
+              </div>
+              <h2 id="result-title">오늘의 집 가고 싶은 지수</h2>
+              <div class="score-row">
+                <strong id="display-score" class="display-score" aria-label="0점">0</strong>
+                <span class="score-unit">/ 1,000,000</span>
+              </div>
+              <div class="meter" role="img" aria-label="집 가고 싶은 지수 게이지"><span id="score-meter"></span></div>
+              <div class="result-explanation">
+                <span id="score-label" class="score-label"></span>
+                <p id="score-reason"></p>
+              </div>
+              <div class="recommendation-card">
+                <div class="recommendation-icon" id="recommendation-icon" aria-hidden="true"></div>
+                <div>
+                  <span class="recommendation-eyebrow">✳ 오늘의 추천</span>
+                  <h3 id="recommendation-title"></h3>
+                  <p id="recommendation-detail"></p>
+                </div>
+              </div>
+              <p id="score-note" class="score-note">사전 규칙으로 계산한 놀이용 점수예요.</p>
+              <button id="retry-button" class="secondary-button" type="button">↻ &nbsp; 다시 해보기</button>
+            </section>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer"><span>WANNAGOM ★</span><span>오늘의 마음을 가볍게 들여다보는 곳</span></footer>
+    </div>
+  </body>
+</html>
