@@ -192,7 +192,7 @@ async function readBody(req) {
   return JSON.parse(body);
 }
 
-const scoreInstructions = "한국어 문장 전체의 문맥을 읽어 집에 가고 싶은 강도를 판단하세요. 부정, 반어, 과장, 유행어, 비속어의 의미를 고려하세요. 기본 점수는 참고값입니다. 반드시 {\"score\":정수,\"factor\":문자열} 형태의 JSON만 출력하세요. score는 0부터 100 사이이고 factor는 피로, 학업, 사람, 부정, 반어, 강조, 기타 중 하나입니다. 사용자에게 보여줄 문장은 작성하지 마세요.";
+const scoreInstructions = "한국어 문장 전체의 문맥을 읽어 집에 가고 싶은 강도를 판단하세요. 부정, 반어, 과장, 유행어, 비속어의 의미를 고려하세요. 사전 기본 점수는 참고값이고 null이면 사전 근거가 없으므로 문맥만으로 판단하세요. 집과 무관한 문장도 집에 가고 싶은 뜻이 약한지 강한지 해석해 0~100으로 답하세요. 반드시 {\"score\":정수,\"factor\":문자열} 형태의 JSON만 출력하세요. score는 0부터 100 사이이고 factor는 피로, 학업, 사람, 부정, 반어, 강조, 기타 중 하나입니다. 사용자에게 보여줄 문장은 작성하지 마세요.";
 const scoreFactors = ["피로", "학업", "사람", "부정", "반어", "강조", "기타"];
 
 function validateScore(parsed) {
@@ -229,8 +229,8 @@ function runClaude(args, input, timeoutMs) {
 
 async function checkClaude() {
   try {
-    await runClaude(["--version"], "", 10000);
-    claudeConfigured = true;
+    const status = JSON.parse(await runClaude(["auth", "status", "--json"], "", 10000));
+    claudeConfigured = status.loggedIn === true;
   } catch {
     claudeConfigured = false;
   }
@@ -307,6 +307,7 @@ const server = http.createServer(async (req, res) => {
     return send(res, 200, fs.readFileSync(path.join(__dirname, file), "utf8"), type);
   }
   if (req.method === "GET" && url.pathname === "/api/status") {
+    await checkClaude();
     return send(res, 200, { connected: Boolean(account?.accessToken && account.scopes?.includes("chatgpt.tokens.use.direct")), email: account?.email || "", claude: claudeConfigured });
   }
   if (req.method === "GET" && url.pathname === "/auth/start") return beginSignIn(res);
@@ -315,10 +316,11 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "POST" && url.pathname === "/api/analyze") {
     try {
       const body = await readBody(req);
-      if (typeof body.text !== "string" || body.text.length > 180 || !body.text.trim() || !Number.isInteger(body.baseline) || body.baseline < 0 || body.baseline > 100) {
+      if (typeof body.text !== "string" || body.text.length > 180 || !body.text.trim() || !(body.baseline === null || (Number.isInteger(body.baseline) && body.baseline >= 0 && body.baseline <= 100))) {
         return send(res, 400, { error: "Invalid input" });
       }
       if (body.provider === "claude") {
+        await checkClaude();
         if (!claudeConfigured) return send(res, 401, { error: "Claude not configured" });
         return send(res, 200, { ...await inferScoreWithClaude(body.text, body.baseline), provider: "claude" });
       }

@@ -4,6 +4,7 @@ const resultScreen = document.getElementById("result-screen");
 const feelingForm = document.getElementById("feeling-form");
 const feelingInput = document.getElementById("feeling-input");
 const formError = document.getElementById("form-error");
+const fieldHint = document.getElementById("field-hint");
 const charCount = document.getElementById("char-count");
 const displayScore = document.getElementById("display-score");
 const scoreMeter = document.getElementById("score-meter");
@@ -40,6 +41,7 @@ function renderAiStatus() {
     aiStatus.textContent = "AI 연결 상태를 확인할 수 없어 기본 점수로 계산해요.";
     aiLogin.hidden = provider !== "chatgpt";
     aiLogout.hidden = true;
+    fieldHint.textContent = "집 생각, 피로, 수업이나 과제처럼 적어줘. Enter로 결과 보기 · Shift+Enter로 줄바꿈";
     return;
   }
   const chatgptConnected = aiStatusData.connected === true;
@@ -50,6 +52,9 @@ function renderAiStatus() {
       : "Claude Code를 찾지 못했어요. Claude Code를 설치하고 로그인한 뒤 서버를 다시 시작해 주세요. 지금은 기본 점수로 계산해요.";
     aiLogin.hidden = true;
     aiLogout.hidden = true;
+    fieldHint.textContent = aiConnected
+      ? "떠오르는 말을 자유롭게 적어줘. Enter로 결과 보기 · Shift+Enter로 줄바꿈"
+      : "집 생각, 피로, 수업이나 과제처럼 적어줘. Enter로 결과 보기 · Shift+Enter로 줄바꿈";
     return;
   }
   aiConnected = chatgptConnected;
@@ -58,6 +63,9 @@ function renderAiStatus() {
     : "연결하면 ChatGPT 플랜으로 문맥을 보정해요. 연결 전에는 기본 점수로 계산해요.";
   aiLogin.hidden = chatgptConnected;
   aiLogout.hidden = !chatgptConnected;
+  fieldHint.textContent = aiConnected
+    ? "떠오르는 말을 자유롭게 적어줘. Enter로 결과 보기 · Shift+Enter로 줄바꿈"
+    : "집 생각, 피로, 수업이나 과제처럼 적어줘. Enter로 결과 보기 · Shift+Enter로 줄바꿈";
   if (!chatgptConnected && new URLSearchParams(location.search).get("login") === "failed") {
     aiStatus.textContent = "ChatGPT 연결을 마치지 못했어요. 다시 눌러 시도해 주세요. 기본 점수는 계속 사용할 수 있어요.";
   }
@@ -169,7 +177,7 @@ const aiReasons = {
   "부정": "집에 가고 싶지 않다는 뜻을 읽고 점수를 조정했어요.",
   "반어": "말의 겉뜻과 다른 뉘앙스를 읽고 점수를 조정했어요.",
   "강조": "강하게 표현한 마음을 점수에 반영했어요.",
-  "기타": "문장 전체의 뜻을 읽고 기본 점수를 조정했어요."
+  "기타": "문장 전체의 뜻을 읽고 점수를 정했어요."
 };
 
 function assessFeeling(text) {
@@ -270,6 +278,12 @@ feelingInput.addEventListener("input", () => {
   clearError();
 });
 
+feelingInput.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" || event.shiftKey || event.isComposing || event.keyCode === 229 || calculateButton.disabled) return;
+  event.preventDefault();
+  feelingForm.requestSubmit();
+});
+
 document.querySelectorAll("[data-example]").forEach((button) => {
   button.addEventListener("click", () => {
     feelingInput.value = button.dataset.example;
@@ -290,7 +304,7 @@ feelingForm.addEventListener("submit", async (event) => {
   }
 
   const result = assessFeeling(text);
-  if (!result) {
+  if (!result && !aiConnected) {
     showError("집 생각이나 피로, 수업처럼 지금 느낌을 조금 더 구체적으로 적어줘.");
     return;
   }
@@ -307,7 +321,7 @@ feelingForm.addEventListener("submit", async (event) => {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, baseline: result.score, provider: getSelectedProvider() })
+        body: JSON.stringify({ text, baseline: result?.score ?? null, provider: getSelectedProvider() })
       });
       if (!response.ok) throw new Error("AI unavailable");
       const data = await response.json();
@@ -321,7 +335,14 @@ feelingForm.addEventListener("submit", async (event) => {
       source = "ai";
       factor = data.factor;
       if (Object.hasOwn(aiProviderNames, data.provider)) provider = data.provider;
-    } catch { /* The planned dictionary fallback remains available. */ }
+    } catch {
+      if (!result) {
+        calculateButton.disabled = false;
+        showScreen(inputScreen);
+        showError("AI 분석을 완료하지 못했어요. 다시 시도하거나 집 생각처럼 기분을 조금 더 적어줘.");
+        return;
+      }
+    }
   }
   const remaining = Math.max(0, (reducedMotion.matches ? 250 : 950) - (performance.now() - start));
   loadingTimer = window.setTimeout(() => {
