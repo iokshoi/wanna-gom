@@ -43,7 +43,7 @@
 
 ## 9. 배포 주소
 
-배포 후 추가
+[워나곰 GitHub Pages](https://iokshoi.github.io/wanna-gom/)
 
 ## 10. AI 활용 표시
 
