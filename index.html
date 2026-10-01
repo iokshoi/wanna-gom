@@ -78,7 +78,7 @@
                   <textarea id="feeling-input" name="feeling" rows="4" maxlength="180" placeholder="예: 과제는 끝이 없고 너무 피곤해서 집 가고 싶어..." aria-describedby="field-hint form-error"></textarea>
                   <span id="char-count" class="char-count">0 / 180</span>
                 </div>
-                <p id="field-hint" class="field-hint">집 생각, 피로, 수업이나 과제처럼 지금 느낌을 구체적으로 적어줘.</p>
+                <p id="field-hint" class="field-hint">집 생각, 피로, 수업이나 과제처럼 적어줘. Enter로 결과 보기 · Shift+Enter로 줄바꿈</p>
                 <p id="form-error" class="form-error" role="alert" hidden></p>
 
                 <div class="examples">
@@ -97,6 +97,10 @@
               <div id="ai-connect" class="ai-connect" hidden>
                 <div>
                   <strong>AI 문맥 보정</strong>
+                  <div class="ai-picker" role="radiogroup" aria-label="사용할 AI">
+                    <label><input type="radio" name="ai-provider" value="chatgpt" checked /> ChatGPT</label>
+                    <label><input type="radio" name="ai-provider" value="claude" /> Claude</label>
+                  </div>
                   <p id="ai-status">연결 상태를 확인하는 중...</p>
                 </div>
                 <a id="ai-login" class="connect-button" href="/auth/start" hidden>Continue with ChatGPT</a>

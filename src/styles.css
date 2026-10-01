@@ -108,6 +108,10 @@ textarea::placeholder { color: #aaa3ab; font-weight: 500; }
 .ai-connect { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 24px; padding: 15px 18px; border: 2px solid var(--ink); border-radius: 12px; background: #eaf7ff; }
 .ai-connect strong { font-size: 13px; }
 .ai-connect p { margin: 4px 0 0; color: #5e5966; font-size: 12px; line-height: 1.5; }
+.ai-picker { display: flex; gap: 8px; margin-top: 8px; }
+.ai-picker label { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border: 2px solid var(--ink); border-radius: 20px; background: white; font-size: 12px; font-weight: 800; cursor: pointer; }
+.ai-picker label:has(input:checked) { background: var(--lime); }
+.ai-picker input { margin: 0; accent-color: var(--ink); }
 .connect-button { flex: 0 0 auto; padding: 9px 12px; border: 2px solid var(--ink); border-radius: 9px; background: white; color: var(--ink); text-decoration: none; font-size: 12px; font-weight: 900; box-shadow: 3px 3px 0 var(--ink); }
 .connect-button:hover { background: var(--lime); }
 

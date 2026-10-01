@@ -1,0 +1,8 @@
+{
+  "name": "wanna-go-home",
+  "private": true,
+  "description": "워나곰: 오늘의 집 가고 싶은 지수",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
